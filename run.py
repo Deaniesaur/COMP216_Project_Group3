@@ -2,9 +2,9 @@ import os
 import threading
 
 scripts = [
-  'python3 temperature_publisher.py --topic="room_temp_1"',
-  'python3 temperature_publisher.py --topic="room_temp_2"',
-  'python3 temperature_publisher.py --topic="room_temp_3"'
+  'python3 temperature_GUI.py --topic="room_temp_1"',
+  'python3 temperature_GUI.py --topic="room_temp_2"',
+  'python3 temperature_GUI.py --topic="room_temp_3"'
 ]
 
 threads = []
