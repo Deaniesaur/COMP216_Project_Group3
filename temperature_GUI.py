@@ -13,6 +13,7 @@ import json
 import string
 import threading
 from datetime import datetime
+import random
 from tkinter import *
 from tkinter import Tk, Canvas, Frame, W
 from tkinter import messagebox
@@ -264,8 +265,30 @@ class RoomTempGUI(Tk):
       min_step=parsedMinStep, max_step=parsedMaxStep, min_cycle=parsedMinCycle, max_cycle=parsedMaxCycle,
       squiggle=self.__squiggle.get())
     publisher = Publisher()
+    miss_transmission = 0
+    rand_int = 0
     while flag_status:
+      wild = random.randint(5, 10)
+      wild_data = random.randint(1, 100)
+      # miss transmission
+      if rand_int == 0:
+        rand_int = random.randint(1, 100)
+      if miss_transmission == 100:
+        rand_int = 0
+        miss_transmission = 0
+      if miss_transmission == rand_int:
+        miss_transmission += 1
+        print('----------------------------\n\nData not sent, -- miss transmission --\n\n---------------------------- ')
+        time.sleep(parsedInterval)
+        continue
+
       temp = tempGenerator.getTemp()
+      # wild data
+      if wild_data == rand_int:
+        temp = temp * wild
+        print('----------------------------\n\n *********** Wild Data ***********\n\n---------------------------- ')
+
+
       try:
         # Create payload data
         msg_dict = {
@@ -286,6 +309,7 @@ class RoomTempGUI(Tk):
       except (KeyboardInterrupt, SystemExit):
         mqtt.DISCONNECT()
         sys.exit()
+      miss_transmission += 1
     # Disconnect from Mqtt broker
     publisher.disconnect()
 
