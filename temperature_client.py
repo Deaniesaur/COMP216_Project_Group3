@@ -21,7 +21,7 @@ class TempClient(Tk):
     def __init__(self):
         super().__init__()
         self.title('Group3 Dynamic Time Series - Temperature')
-        self.__data = []
+        self.create_vars()
 
         # Initialize UI
         self.initUI()
@@ -33,17 +33,89 @@ class TempClient(Tk):
         mqttc.on_message = self.on_message
         mqttc.on_subscribe = self.on_subscribe
         mqttc.on_unsubscribe = self.on_unsubscribed
-
-        # Connect to Mqtt broker on specified host and port
-        mqttc.connect(host='localhost', port=1883)
-        mqttc.loop_start()
-
-    def on_connect(self, mqttc, userdata, flags, rc):
-        print('Connected.. \n Return code: ' + str(rc))
-        mqttc.subscribe(topic='room_temp_1/#', qos=0)
+        self.__mqttc = mqttc
 
     def on_disconnect(self, mqrrc, userdata, rc):
         print('Disconnected.. \n Return code: ' + str(rc))
+
+    def on_unsubscribed(self, mqttc, userdata, mid, granted_qos):
+        print('Unsubscribed')
+
+    def update_data(self, newTemp):
+        print('data', self.__data)
+
+        if (newTemp < -40 or newTemp > 40):
+            self.__status.set('Skipping wild data: ' + newTemp)
+            return
+        else:
+            self.__status.set('Normal')
+        
+        if(len(self.__data) >= 20):
+            self.__data.pop(0)
+
+        self.__data.append(newTemp)
+
+        # Method to Display Rectangles and Lines
+        self.canv.delete('all')
+        self.displayLines()
+        self.displayData()
+
+    def create_styles(self, parent=None):
+        style = Style()
+        style.configure('TFrame', background='#c8e6d3')
+        style.configure('TLabel', background='#c8e6d3')
+
+    def create_vars(self):
+        self.__data = []
+        self.__sensorName = StringVar()
+        self.__status = StringVar(value='Normal')
+        self.__name = StringVar(value='Sensor Name')
+        self.__temp = DoubleVar(value=0)
+        self.__ipv4 = StringVar(value='0.0.0.0')
+
+    # dropdown options
+        self.__sensors_name = ["sensor1", "sensor2", "sensor3"]
+
+    def initUI(self):
+
+        Canvas(width=860, height=280).pack()
+        container = Frame(self, padding=(5, 5))
+        container.place(relx=0.015, rely=0.02, relheight=0.96, relwidth=0.97)
+        Label(container, text='Temperature Client', font='Arial 12 bold').place(relx=0.33, height=30)
+        
+        Label(container, text='Name: ').place(relx=0.75, rely=0.25)
+        Label(container, textvariable=self.__name).place(relx=0.85, rely=0.25)
+        Label(container, text='IPv4: ').place(relx=0.75, rely=0.35)
+        Label(container, textvariable=self.__ipv4).place(relx=0.85, rely=0.35)
+        Label(container, text='Temperature: ').place(relx=0.75, rely=0.45)
+        Label(container, textvariable=self.__temp).place(relx=0.85, rely=0.45)
+        Label(container, text='Status: ').place(relx=0.75, rely=0.55)
+        Label(container, textvariable=self.__status).place(relx=0.85, rely=0.55)
+        Combobox(container, values=self.__sensors_name, textvariable=self.__sensorName).place(relx=0.75, rely=0.7)
+        self.startButton = Button(text='Start', command=self.btn_start_on_click).place(relx=0.73, rely=0.79)
+        self.stopButton = Button(text='Stop', command=self.btn_stop_on_click).place(relx=0.85, rely=0.79)
+        # Initialize Canvas
+        self.canv = Canvas(self)
+        self.canv.place(relx=0.05, rely=0.24, width=500, height=180)
+
+        # Initialize Start Value
+        self.create_styles()
+
+    def btn_start_on_click(self):
+        # Connect to Mqtt broker on specified host and port
+        self.__mqttc.connect(host='localhost', port=1883)
+        self.__mqttc.loop_start()
+
+        print('Start Button:\n')
+        print(self.__sensorName.get())
+
+    def btn_stop_on_click(self):
+        self.__mqttc.disconnect()
+
+    def on_connect(self, mqttc, userdata, flags, rc):
+        print('Connected.. \n Return code: ' + str(rc))
+        #self.__sensorName = "sensor1"
+        mqttc.subscribe(topic=self.__sensorName.get(), qos=0)
 
     def on_message(self, mqttc, userdata, msg):
         print('"\n------ Received Message ------\n"')
@@ -51,43 +123,14 @@ class TempClient(Tk):
         message = json.loads(msg.payload)
         print(message)
         self.update_data(message['temp'])
+        
+        self.__name.set(message['name'])
+        self.__temp.set(message['temp'])
+        self.__ipv4.set(message['ipv4'])
 
     def on_subscribe(self, mqttc, userdata, mid, granted_qos):
         print('Subscribed')
-
-    def on_unsubscribed(self, mqttc, userdata, mid, granted_qos):
-        print('Unsubscribed')
-
-    def update_data(self, newTemp):
-        print('data', self.__data)
-        if(len(self.__data) >= 20):
-            self.__data.pop(0)
-
-        self.__data.append(newTemp)
-        
-        # Method to Display Rectangles and Lines
-        self.canv.delete('all')
-        self.displayLines()
-        self.displayData()
-
-    def create_styles(self):
-        style = Style()
-        style.configure('TFrame', background='#80cc80')
-        style.configure('TLabel', background='#80cc80')
-
-    def initUI(self):
-        Canvas(width=600, height=280).pack()
-        container = Frame(self, padding=(5, 5))
-        container.place(relx=0.015, rely=0.02, relheight=0.96, relwidth=0.97)
-        Label(container, text='Temp Range: 18 - 21 only', font='Arial 12 bold').place(relx=0.33, height=30)
-
-        # Initialize Canvas
-        self.canv = Canvas(self)
-        self.canv.place(relx=0.1, rely=0.24, width=500, height=180)
-        
-        # Initialize Start Value
-        self.create_styles()
-
+    
     def displayLines(self):
         self.canv = Canvas(self)
         self.canv.place(relx=0.1, rely=0.24, width=500, height=180)

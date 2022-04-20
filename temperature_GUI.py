@@ -294,13 +294,13 @@ class RoomTempGUI(Tk):
         msg_dict = {
           "name": parsedName,
           "temp": temp,
-          "macAddress": self.sensors_address[parsedName],
+          "ipv4": self.sensors_address[parsedName],
           "timeStamp": datetime.now()
         }
         # Convert to string
         data = json.dumps(msg_dict, indent=4, sort_keys=True, default=str)
         # Publish on a topic
-        publisher.publish(topic=parsedName, payload=data, qos=0)
+        publisher.publish(topic=self.__topic, payload=data, qos=0)
         print('Published msg: {}'.format(msg_dict))
         # Increment published cycle count
         # Sleep loop for 5 secs
