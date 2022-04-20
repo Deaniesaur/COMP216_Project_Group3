@@ -12,7 +12,6 @@
 import json
 import string
 import threading
-from datetime import datetime
 import random
 from tkinter import *
 from tkinter import Tk, Canvas, Frame, W
@@ -20,6 +19,7 @@ from tkinter import messagebox
 from tkinter.ttk import *
 import argparse
 import time, sys
+from matplotlib.pyplot import flag
 import paho.mqtt.client as mqtt
 from publisher import Publisher
 
@@ -28,8 +28,6 @@ from group_3_roomtemp_generator import RoomTemp
 flag_status = False
 
 class RoomTempGUI(Tk):
-
-  flag_status = 0
   sensors_address = {
     "LivingRoom": "123.89.46.72",
     "Kitchen": "123.89.46.44",
@@ -68,6 +66,7 @@ class RoomTempGUI(Tk):
     Grid.columnconfigure(self, index=1, weight=3)
 
   def create_vars(self):
+    self.__flag_status = False
     self.__name = StringVar()
     self.__time = StringVar()
     self.__base = StringVar()
@@ -79,13 +78,15 @@ class RoomTempGUI(Tk):
     self.__min_cycle = StringVar()
     self.__max_cycle = StringVar()
     self.__squiggle = BooleanVar()
+    self.__button_name = StringVar(value='Start')
+    self.__status = StringVar(value='Standby')
 
     # dropdown options
     self.__minMaxValues = [18, 18.5, 19, 19.5, 20, 20.5, 21]
     self.__stepsValues = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
     self.__cycleValues = [1, 2, 3, 4]
     self.__sensors_name = ["LivingRoom", "Kitchen", "Bath Room", "Mater Bedroom", "Dinning Room", "Play Room", "Laundry"]
-    self.__time_intervals = [0.5, 1, 1.5, 2, 2.5]
+    self.__time_intervals = [0.25, 0.5, 1, 1.5, 2, 2.5]
 
   def create_ui(self, parent=None):
     if not parent:
@@ -205,58 +206,58 @@ class RoomTempGUI(Tk):
     trueSquiggleRadioBtn.grid(row=11, column=1, columnspan=2, sticky=W, pady=(0, 5))
     falseSquiggleRadioBtn.grid(row=12, column=1, columnspan=2, sticky=W, pady=(0, 5))
 
-    Button(parent, text='Start', width=18, command=self.btn_start_on_click).grid(row=13, column=0, padx=3, pady=(0, 10))
-    Button(parent, text='Stop', width=18, command=self.btn_stop_on_click).grid(row=13, column=1, padx=3, pady=(0, 10))
-    #Button(parent, text='Exit', command=self.destroy, width=18).grid(row=12, column=1, padx=3, pady=(0, 10))
+    Button(parent, textvariable=self.__button_name, width=18, command=self.btn_click).grid(row=13, column=0, padx=3, pady=(0, 10))
+    Label(parent, textvariable=self.__status, width=30).grid(row=13, column=1, padx=3, pady=(0, 10))
 
-  def btn_stop_on_click(self):
-    global flag_status
-    flag_status = False
+  def btn_click(self):
+    if self.__button_name.get() == 'Start':
+      self.__button_name.set('Stop')
+      self.__flag_status = True
+      # parse values to float for validation
+      parsedBase = float(self.__base.get())
+      parsedMin = float(self.__min.get())
+      parsedMax = float(self.__max.get())
+      parsedMinStep = float(self.__min_step.get())
+      parsedMaxStep = float(self.__max_step.get())
+      parsedMinCycle = int(self.__min_cycle.get())
+      parsedMaxCycle = int(self.__max_cycle.get())
+      parsedName = self.__name.get()
+      parsedInterval = float(self.__time.get())
 
-  def btn_start_on_click(self):
-    global flag_status
-    flag_status = True
-    print('clicked publish')
-    # parse values to float for validation
-    parsedBase = float(self.__base.get())
-    parsedMin = float(self.__min.get())
-    parsedMax = float(self.__max.get())
-    parsedMinStep = float(self.__min_step.get())
-    parsedMaxStep = float(self.__max_step.get())
-    parsedMinCycle = int(self.__min_cycle.get())
-    parsedMaxCycle = int(self.__max_cycle.get())
-    parsedName = self.__name.get()
-    parsedInterval = float(self.__time.get())
-
-    # if blank delta entry
-    if not self.__delta.get().strip():   
-      messagebox.showinfo(title='Information', message="Please enter delta value")
-      return
-    
-    # input may be invalid valid values are -1 to 1
-    try:
-      parsedDelta = float(self.__delta.get())
-      if(parsedDelta < -1 or parsedDelta > 1):
-        messagebox.showinfo(title='Information', message="Delta must be from -1 to 1")
+      # if blank delta entry
+      if not self.__delta.get().strip():   
+        messagebox.showinfo(title='Information', message="Please enter delta value")
         return
-    except Exception as e:
-      parseErroMsg = f'Error parsing input: {e}'
-      messagebox.showinfo(title='Information', message=parseErroMsg)
-      return
+      
+      # input may be invalid valid values are -1 to 1
+      try:
+        parsedDelta = float(self.__delta.get())
+        if(parsedDelta < -1 or parsedDelta > 1):
+          messagebox.showinfo(title='Information', message="Delta must be from -1 to 1")
+          return
+      except Exception as e:
+        parseErroMsg = f'Error parsing input: {e}'
+        messagebox.showinfo(title='Information', message=parseErroMsg)
+        return
 
-    if (parsedMaxCycle <= parsedMinCycle):
-      messagebox.showinfo(title='Information', message="Max cycle must be greater than min cycle")
-      return
+      if (parsedMaxCycle <= parsedMinCycle):
+        messagebox.showinfo(title='Information', message="Max cycle must be greater than min cycle")
+        return
 
-    print(f'topic name: {self.__topic}')
-    print(f'base: {parsedBase}\nmin: {parsedMin}\nmax: {parsedMax}\ndelta: {parsedDelta}\nmin_step: {parsedMinStep}\nmax_step: {parsedMaxStep}')
-    print(f'min cycle: {parsedMinCycle}\nmax cycle: {parsedMaxCycle}\nsquiggle: {self.__squiggle.get()}')
+      print(f'topic name: {self.__topic}')
+      print(f'base: {parsedBase}\nmin: {parsedMin}\nmax: {parsedMax}\ndelta: {parsedDelta}\nmin_step: {parsedMinStep}\nmax_step: {parsedMaxStep}')
+      print(f'min cycle: {parsedMinCycle}\nmax cycle: {parsedMaxCycle}\nsquiggle: {self.__squiggle.get()}')
 
-    thread = threading.Thread(
-      target=self.run,
-      args=[parsedBase, parsedMin, parsedMax, parsedDelta, parsedMinStep, parsedMaxStep, parsedMinCycle, parsedMaxCycle, parsedName, parsedInterval])
-    thread.setDaemon(True)
-    thread.start()
+      thread = threading.Thread(
+        target=self.run,
+        args=[parsedBase, parsedMin, parsedMax, parsedDelta, parsedMinStep, parsedMaxStep, parsedMinCycle, parsedMaxCycle, parsedName, parsedInterval])
+      thread.setDaemon(True)
+      thread.start()
+    
+    else:
+      self.__button_name.set('Start')
+      self.__status.set('Standby')
+      self.__flag_status = False
 
   def run(self, parsedBase, parsedMin, parsedMax, parsedDelta, parsedMinStep, parsedMaxStep, parsedMinCycle, parsedMaxCycle, parsedName, parsedInterval):
     # generate room temperature
@@ -267,7 +268,7 @@ class RoomTempGUI(Tk):
     publisher = Publisher()
     miss_transmission = 0
     rand_int = 0
-    while flag_status:
+    while self.__flag_status:
       wild = random.randint(5, 10)
       wild_data = random.randint(1, 100)
       # miss transmission
@@ -288,20 +289,21 @@ class RoomTempGUI(Tk):
         temp = temp * wild
         print('----------------------------\n\n *********** Wild Data ***********\n\n---------------------------- ')
 
-
       try:
         # Create payload data
+        packetId = int(time.time() * 1000)
         msg_dict = {
+          "packetId": packetId,
           "name": parsedName,
           "temp": temp,
           "macAddress": self.sensors_address[parsedName],
-          "timeStamp": datetime.now()
         }
         # Convert to string
         data = json.dumps(msg_dict, indent=4, sort_keys=True, default=str)
         # Publish on a topic
-        publisher.publish(topic=parsedName, payload=data, qos=0)
+        publisher.publish(topic=self.__topic, payload=data, qos=0)
         print('Published msg: {}'.format(msg_dict))
+        self.__status.set(f'Packet Sending: {msg_dict["packetId"]}')
         # Increment published cycle count
         # Sleep loop for 5 secs
         time.sleep(parsedInterval)
