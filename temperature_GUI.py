@@ -295,8 +295,9 @@ class RoomTempGUI(Tk):
         msg_dict = {
           "packetId": packetId,
           "name": parsedName,
+          "ipv4": self.sensors_address[parsedName],
           "temp": temp,
-          "macAddress": self.sensors_address[parsedName],
+          "interval": parsedInterval
         }
         # Convert to string
         data = json.dumps(msg_dict, indent=4, sort_keys=True, default=str)
