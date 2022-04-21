@@ -20,7 +20,7 @@ import json
 class TempClient(Tk):
     def __init__(self):
         super().__init__()
-        self.title('Group3 Dynamic Time Series - Temperature')
+        self.title('Group3 - Sensor Client')
         self.create_vars()
 
         # Initialize UI
@@ -120,6 +120,7 @@ class TempClient(Tk):
             self.__button_name.set('Start')
             self.__mqttc.unsubscribe(topic=self.__sensorName.get())
             self.__mqttc.loop_stop()
+            self.clear_data()
 
     def on_connect(self, mqttc, userdata, flags, rc):
         print('Connected.. \n Return code: ' + str(rc))

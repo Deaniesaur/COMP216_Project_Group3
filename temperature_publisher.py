@@ -31,15 +31,15 @@ class RoomTempGUI(Tk):
     "LivingRoom": "123.89.46.72",
     "Kitchen": "123.89.46.44",
     "Bath Room": "123.89.46.56",
-    "Mater Bedroom": "123.89.46.98",
-    "Dinning Room": "123.89.46.34",
+    "Master Bedroom": "123.89.46.98",
+    "Dining Room": "123.89.46.34",
     "Play Room": "123.89.46.65",
     "Laundry": "123.89.46.89"
   }
 
   def __init__(self, topic_name):
     super().__init__()
-    self.title('Room Temperature Publisher')
+    self.title(f'Temperature Publisher - {topic_name}')
     self.__topic = topic_name
 
     # Initialize UI
