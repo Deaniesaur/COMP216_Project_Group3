@@ -21,7 +21,6 @@ import argparse
 import time, sys
 from matplotlib.pyplot import flag
 import paho.mqtt.client as mqtt
-from publisher import Publisher
 
 from group_3_roomtemp_generator import RoomTemp
 
@@ -47,6 +46,14 @@ class RoomTempGUI(Tk):
     self.create_vars()
     self.create_ui()
     self.configureResizable()
+
+    # Create Mqtt client
+    self.mqttc = mqtt.Client()
+    # Register callbacks
+    self.mqttc.on_connect = self.on_connect
+    self.mqttc.on_disconnect = self.on_disconnect
+    self.mqttc.on_message = self.on_message
+    self.mqttc.on_publish = self.on_publish
 
   def configureResizable(self):
     row_index = 0
@@ -85,7 +92,7 @@ class RoomTempGUI(Tk):
     self.__minMaxValues = [18, 18.5, 19, 19.5, 20, 20.5, 21]
     self.__stepsValues = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
     self.__cycleValues = [1, 2, 3, 4]
-    self.__sensors_name = ["LivingRoom", "Kitchen", "Bath Room", "Mater Bedroom", "Dinning Room", "Play Room", "Laundry"]
+    self.__sensors_name = list(self.sensors_address.keys())
     self.__time_intervals = [0.25, 0.5, 1, 1.5, 2, 2.5]
 
   def create_ui(self, parent=None):
@@ -248,6 +255,7 @@ class RoomTempGUI(Tk):
       print(f'base: {parsedBase}\nmin: {parsedMin}\nmax: {parsedMax}\ndelta: {parsedDelta}\nmin_step: {parsedMinStep}\nmax_step: {parsedMaxStep}')
       print(f'min cycle: {parsedMinCycle}\nmax cycle: {parsedMaxCycle}\nsquiggle: {self.__squiggle.get()}')
 
+      self.mqttc.connect(host='localhost', port=1883)
       thread = threading.Thread(
         target=self.run,
         args=[parsedBase, parsedMin, parsedMax, parsedDelta, parsedMinStep, parsedMaxStep, parsedMinCycle, parsedMaxCycle, parsedName, parsedInterval])
@@ -265,7 +273,6 @@ class RoomTempGUI(Tk):
       min=parsedMin, max=parsedMax, delta=parsedDelta,
       min_step=parsedMinStep, max_step=parsedMaxStep, min_cycle=parsedMinCycle, max_cycle=parsedMaxCycle,
       squiggle=self.__squiggle.get())
-    publisher = Publisher()
     miss_transmission = 0
     rand_int = 0
     while self.__flag_status:
@@ -302,8 +309,7 @@ class RoomTempGUI(Tk):
         # Convert to string
         data = json.dumps(msg_dict, indent=4, sort_keys=True, default=str)
         # Publish on a topic
-        publisher.publish(topic=self.__topic, payload=data, qos=0)
-        print('Published msg: {}'.format(msg_dict))
+        self.mqttc.publish(topic=self.__topic, payload=data, qos=0)
         self.__status.set(f'Packet Sending: {msg_dict["packetId"]}')
         # Increment published cycle count
         # Sleep loop for 5 secs
@@ -314,7 +320,27 @@ class RoomTempGUI(Tk):
         sys.exit()
       miss_transmission += 1
     # Disconnect from Mqtt broker
-    publisher.disconnect()
+    self.mqttc.disconnect()
+  
+  def on_connect(self, mqttc, userdata, flags, rc):
+      print('Connected.. \n Return code: ' + str(rc))
+
+  def on_disconnect(self, mqttc, userdata, rc):
+      print('disconnected..')
+
+  def on_message(self, mqttc, userdata, msg):
+      print('"\n------ Received Message ------\n"')
+      print('Topic: ' + msg.topic + + ', Message: ' + str(msg.payload))
+
+  def on_publish(self, mqttc, userdata, mid):
+      print(f'Published MID: {mid}')
+
+  def publish(self, topic, payload, qos=0):
+      self.mqttc.publish(topic=topic, payload=payload, qos=qos)
+      return
+
+  def disconnect(self):
+      self.mqttc.disconnect()
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()

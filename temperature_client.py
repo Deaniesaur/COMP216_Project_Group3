@@ -45,7 +45,7 @@ class TempClient(Tk):
         print('data', self.__data)
 
         if (newTemp < -40 or newTemp > 40):
-            self.__status.set('Skipping wild data: ' + newTemp)
+            self.__status.set('Skipping wild data: ' + str(newTemp))
             return
         else:
             self.__status.set('Normal')
@@ -60,6 +60,11 @@ class TempClient(Tk):
         self.displayLines()
         self.displayData()
 
+    def clear_data(self):
+        self.__data.clear()
+        self.canv.delete('all')
+        self.displayLines()
+
     def create_styles(self, parent=None):
         style = Style()
         style.configure('TFrame', background='#c8e6d3')
@@ -72,6 +77,7 @@ class TempClient(Tk):
         self.__name = StringVar(value='Sensor Name')
         self.__temp = DoubleVar(value=0)
         self.__ipv4 = StringVar(value='0.0.0.0')
+        self.__button_name = StringVar(value='Start')
 
     # dropdown options
         self.__sensors_name = ["sensor1", "sensor2", "sensor3"]
@@ -91,9 +97,10 @@ class TempClient(Tk):
         Label(container, textvariable=self.__temp).place(relx=0.85, rely=0.45)
         Label(container, text='Status: ').place(relx=0.75, rely=0.55)
         Label(container, textvariable=self.__status).place(relx=0.85, rely=0.55)
-        Combobox(container, values=self.__sensors_name, textvariable=self.__sensorName).place(relx=0.75, rely=0.7)
-        self.startButton = Button(text='Start', command=self.btn_start_on_click).place(relx=0.73, rely=0.79)
-        self.stopButton = Button(text='Stop', command=self.btn_stop_on_click).place(relx=0.85, rely=0.79)
+        topicOptions = Combobox(container, values=self.__sensors_name, textvariable=self.__sensorName)
+        topicOptions.place(relx=0.75, rely=0.7)
+        topicOptions.current(0)
+        self.startButton = Button(textvariable=self.__button_name, command=self.btn_on_click).place(relx=0.73, rely=0.79)
         # Initialize Canvas
         self.canv = Canvas(self)
         self.canv.place(relx=0.05, rely=0.24, width=500, height=180)
@@ -101,20 +108,21 @@ class TempClient(Tk):
         # Initialize Start Value
         self.create_styles()
 
-    def btn_start_on_click(self):
-        # Connect to Mqtt broker on specified host and port
-        self.__mqttc.connect(host='localhost', port=1883)
-        self.__mqttc.loop_start()
-
-        print('Start Button:\n')
-        print(self.__sensorName.get())
-
-    def btn_stop_on_click(self):
-        self.__mqttc.disconnect()
+    def btn_on_click(self):
+        if self.__button_name.get() == 'Start':
+            # Set States
+            self.__button_name.set('Stop')
+            # Connect to Mqtt broker on specified host and port
+            self.__mqttc.connect(host='localhost', port=1883)
+            self.__mqttc.loop_start()
+            print('Starting:', self.__sensorName.get())
+        else:
+            self.__button_name.set('Start')
+            self.__mqttc.unsubscribe(topic=self.__sensorName.get())
+            self.__mqttc.loop_stop()
 
     def on_connect(self, mqttc, userdata, flags, rc):
         print('Connected.. \n Return code: ' + str(rc))
-        #self.__sensorName = "sensor1"
         mqttc.subscribe(topic=self.__sensorName.get(), qos=0)
 
     def on_message(self, mqttc, userdata, msg):
