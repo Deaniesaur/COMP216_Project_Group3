@@ -24,8 +24,6 @@ import paho.mqtt.client as mqtt
 
 from group_3_roomtemp_generator import RoomTemp
 
-flag_status = False
-
 class RoomTempGUI(Tk):
   sensors_address = {
     "LivingRoom": "123.89.46.72",
@@ -94,6 +92,7 @@ class RoomTempGUI(Tk):
     self.__cycleValues = [1, 2, 3, 4]
     self.__sensors_name = list(self.sensors_address.keys())
     self.__time_intervals = [0.25, 0.5, 1, 1.5, 2, 2.5]
+    self.__max_iteration = 20
 
   def create_ui(self, parent=None):
     if not parent:
@@ -131,7 +130,7 @@ class RoomTempGUI(Tk):
     timeComboBox = Combobox(parent, width=20, textvariable=self.__time)
     timeComboBox['values'] = self.__time_intervals
     # set default
-    timeComboBox.current(2)
+    timeComboBox.current(0)
     timeComboBox.grid(row=2, column=1, sticky='W', pady=(0, 1))
 
     # create base combobox
@@ -273,27 +272,29 @@ class RoomTempGUI(Tk):
       min=parsedMin, max=parsedMax, delta=parsedDelta,
       min_step=parsedMinStep, max_step=parsedMaxStep, min_cycle=parsedMinCycle, max_cycle=parsedMaxCycle,
       squiggle=self.__squiggle.get())
-    miss_transmission = 0
-    rand_int = 0
+    miss_transmission = random.randint(1, self.__max_iteration)
+    wild_transmission = random.randint(1, self.__max_iteration)
+    iteration = 0
     while self.__flag_status:
-      wild = random.randint(5, 10)
-      wild_data = random.randint(1, 100)
+      iteration = iteration + 1
+      # reset values
+      if iteration > self.__max_iteration:
+        print('---------------MAX ITERATION-------------------------')
+        iteration = 0
+        miss_transmission = random.randint(1, self.__max_iteration)
+        wild_transmission = random.randint(1, self.__max_iteration)
+
       # miss transmission
-      if rand_int == 0:
-        rand_int = random.randint(1, 100)
-      if miss_transmission == 100:
-        rand_int = 0
-        miss_transmission = 0
-      if miss_transmission == rand_int:
-        miss_transmission += 1
+      print('miss', miss_transmission, iteration)
+      if miss_transmission == iteration:
         print('----------------------------\n\nData not sent, -- miss transmission --\n\n---------------------------- ')
         time.sleep(parsedInterval)
         continue
 
       temp = tempGenerator.getTemp()
       # wild data
-      if wild_data == rand_int:
-        temp = temp * wild
+      if wild_transmission == iteration:
+        temp = temp * random.randint(2,10)
         print('----------------------------\n\n *********** Wild Data ***********\n\n---------------------------- ')
 
       try:
@@ -306,6 +307,7 @@ class RoomTempGUI(Tk):
           "temp": temp,
           "interval": parsedInterval
         }
+        print('Payload:', msg_dict)
         # Convert to string
         data = json.dumps(msg_dict, indent=4, sort_keys=True, default=str)
         # Publish on a topic
@@ -318,9 +320,6 @@ class RoomTempGUI(Tk):
       except (KeyboardInterrupt, SystemExit):
         mqtt.DISCONNECT()
         sys.exit()
-      miss_transmission += 1
-    # Disconnect from Mqtt broker
-    self.mqttc.disconnect()
   
   def on_connect(self, mqttc, userdata, flags, rc):
       print('Connected.. \n Return code: ' + str(rc))

@@ -41,14 +41,22 @@ class TempClient(Tk):
     def on_unsubscribed(self, mqttc, userdata, mid, granted_qos):
         print('Unsubscribed')
 
-    def update_data(self, newTemp):
-        print('data', self.__data)
+    def update_data(self, packetId, interval, newTemp):
+        # Check if there is lost transmission
+        lost = (packetId - self.__lastReceived) > (interval * 1000 * 1.1)
+        if (self.__lastReceived > 0 and lost):
+            print('Missing Detected!')
+            miss = self.__missing.get()
+            self.__missing.set(miss + 1)
 
+        self.__lastReceived = packetId
+
+        # Wild Data is not added to dataset
         if (newTemp < -40 or newTemp > 40):
-            self.__status.set('Skipping wild data: ' + str(newTemp))
+            print('Wild Detected!')
+            wild = self.__wild.get()
+            self.__wild.set(wild + 1)
             return
-        else:
-            self.__status.set('Normal')
         
         if(len(self.__data) >= 20):
             self.__data.pop(0)
@@ -60,11 +68,6 @@ class TempClient(Tk):
         self.displayLines()
         self.displayData()
 
-    def clear_data(self):
-        self.__data.clear()
-        self.canv.delete('all')
-        self.displayLines()
-
     def create_styles(self, parent=None):
         style = Style()
         style.configure('TFrame', background='#c8e6d3')
@@ -73,10 +76,13 @@ class TempClient(Tk):
     def create_vars(self):
         self.__data = []
         self.__sensorName = StringVar()
-        self.__status = StringVar(value='Normal')
+        self.__packetId = StringVar(value='000000000000')
         self.__name = StringVar(value='Sensor Name')
         self.__temp = DoubleVar(value=0)
         self.__ipv4 = StringVar(value='0.0.0.0')
+        self.__wild = IntVar(value=0)
+        self.__missing = IntVar(value=0)
+        self.__lastReceived = -1
         self.__button_name = StringVar(value='Start')
 
     # dropdown options
@@ -88,15 +94,18 @@ class TempClient(Tk):
         container = Frame(self, padding=(5, 5))
         container.place(relx=0.015, rely=0.02, relheight=0.96, relwidth=0.97)
         Label(container, text='Temperature Client', font='Arial 12 bold').place(relx=0.33, height=30)
-        
-        Label(container, text='Name: ').place(relx=0.75, rely=0.25)
+        Label(container, text='PacketID: ').place(relx=0.67, rely=0.15)
+        Label(container, textvariable=self.__packetId).place(relx=0.85, rely=0.15)
+        Label(container, text='Name: ').place(relx=0.67, rely=0.25)
         Label(container, textvariable=self.__name).place(relx=0.85, rely=0.25)
-        Label(container, text='IPv4: ').place(relx=0.75, rely=0.35)
+        Label(container, text='IPv4: ').place(relx=0.67, rely=0.35)
         Label(container, textvariable=self.__ipv4).place(relx=0.85, rely=0.35)
-        Label(container, text='Temperature: ').place(relx=0.75, rely=0.45)
+        Label(container, text='Temperature: ').place(relx=0.67, rely=0.45)
         Label(container, textvariable=self.__temp).place(relx=0.85, rely=0.45)
-        Label(container, text='Status: ').place(relx=0.75, rely=0.55)
-        Label(container, textvariable=self.__status).place(relx=0.85, rely=0.55)
+        Label(container, text='Wild Data: ').place(relx=0.67, rely=0.55)
+        Label(container, textvariable=self.__wild).place(relx=0.85, rely=0.55)
+        Label(container, text='Missing: ').place(relx=0.67, rely=0.65)
+        Label(container, textvariable=self.__missing).place(relx=0.85, rely=0.65)
         topicOptions = Combobox(container, values=self.__sensors_name, textvariable=self.__sensorName)
         topicOptions.place(relx=0.75, rely=0.7)
         topicOptions.current(0)
@@ -112,6 +121,10 @@ class TempClient(Tk):
         if self.__button_name.get() == 'Start':
             # Set States
             self.__button_name.set('Stop')
+            self.__data.clear()
+            self.__lastReceived = -1
+            self.__wild.set(0)
+            self.__missing.set(0)
             # Connect to Mqtt broker on specified host and port
             self.__mqttc.connect(host='localhost', port=1883)
             self.__mqttc.loop_start()
@@ -120,22 +133,19 @@ class TempClient(Tk):
             self.__button_name.set('Start')
             self.__mqttc.unsubscribe(topic=self.__sensorName.get())
             self.__mqttc.loop_stop()
-            self.clear_data()
 
     def on_connect(self, mqttc, userdata, flags, rc):
         print('Connected.. \n Return code: ' + str(rc))
         mqttc.subscribe(topic=self.__sensorName.get(), qos=0)
 
     def on_message(self, mqttc, userdata, msg):
-        print('"\n------ Received Message ------\n"')
-        print('Topic: ' + msg.topic + ', Message: ' + str(msg.payload))
+        # print('"\n------ Received Message ------\n"')
+        # print('Topic: ' + msg.topic + ', Message: ' + str(msg.payload))
         message = json.loads(msg.payload)
-        print(message)
-        self.update_data(message['temp'])
-        
         self.__name.set(message['name'])
         self.__temp.set(message['temp'])
         self.__ipv4.set(message['ipv4'])
+        self.update_data(message['packetId'], message['interval'], message['temp'])
 
     def on_subscribe(self, mqttc, userdata, mid, granted_qos):
         print('Subscribed')
