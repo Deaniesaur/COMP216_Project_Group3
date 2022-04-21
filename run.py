@@ -2,11 +2,11 @@ import os
 import threading
 
 scripts = [
-  'python3 temperature_publisher.py --topic="sensor1"',
-  'python3 temperature_publisher.py --topic="sensor2"',
-  'python3 temperature_publisher.py --topic="sensor3"',
-  'python3 temperature_client.py',
-  'python3 temperature_client.py'
+  'python group_3_publisher.py --topic="sensor1"',
+  'python group_3_publisher.py --topic="sensor2"',
+  'python group_3_publisher.py --topic="sensor3"',
+  'python group_3_subscriber.py',
+  'python group_3_subscriber.py'
 ]
 
 threads = []

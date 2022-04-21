@@ -1,6 +1,6 @@
 # COMP216 W2022 | SEC.001 - Group 3
 # Final Project - Publisher
-# April 16, 2022
+# April 20, 2022
 # Participants:
 # Alvarado, Bernadette
 # Ariza Bustos, Luz
@@ -22,7 +22,7 @@ import time, sys
 from matplotlib.pyplot import flag
 import paho.mqtt.client as mqtt
 
-from group_3_roomtemp_generator import RoomTemp
+from group_3_data_generator import RoomTemp
 
 class RoomTempGUI(Tk):
   sensors_address = {
@@ -92,7 +92,7 @@ class RoomTempGUI(Tk):
     self.__cycleValues = [1, 2, 3, 4]
     self.__sensors_name = list(self.sensors_address.keys())
     self.__time_intervals = [0.25, 0.5, 1, 1.5, 2, 2.5]
-    self.__max_iteration = 20
+    self.__max_iteration = 100
 
   def create_ui(self, parent=None):
     if not parent:

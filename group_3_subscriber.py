@@ -1,6 +1,6 @@
 # COMP216 W2022 | SEC.001 - Group 3
-# Lab Assignment 10 - Display Dynamic Time Series
-# April 6, 2022
+# Final Project - Subscriber
+# April 20, 2022
 # Participants:
 # Alvarado, Bernadette
 # Ariza Bustos, Luz
@@ -142,6 +142,7 @@ class TempClient(Tk):
         # print('"\n------ Received Message ------\n"')
         # print('Topic: ' + msg.topic + ', Message: ' + str(msg.payload))
         message = json.loads(msg.payload)
+        self.__packetId.set(message['packetId'])
         self.__name.set(message['name'])
         self.__temp.set(message['temp'])
         self.__ipv4.set(message['ipv4'])
